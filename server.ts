@@ -149,8 +149,14 @@ const DEFAULT_SETTINGS: AppSettings = {
   contactEmail: "rezulpersonal@gmail.com"
 };
 
-// Helper functions for DB access with migration
-function readFullDatabase(): DatabaseSchema {
+// --- START PERSISTENT CLOUD STORAGE INTEGRATION ---
+const CLOUD_DB_URL = "https://kvdb.io/f513dd116e8141f69665/portfolio_database";
+
+let localCachedDb: DatabaseSchema | null = null;
+let lastCloudSyncTimestamp = 0;
+const CLOUD_SYNC_COOLDOWN_MS = 2500; // Snappy threshold
+
+function readLocalDatabaseOnly(): DatabaseSchema {
   try {
     if (!fs.existsSync(DB_FILE)) {
       const initial: DatabaseSchema = {
@@ -158,20 +164,19 @@ function readFullDatabase(): DatabaseSchema {
         settings: DEFAULT_SETTINGS,
         inquiries: []
       };
-      writeFullDatabase(initial);
+      fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2), "utf-8");
       return initial;
     }
     const data = fs.readFileSync(DB_FILE, "utf-8");
     const parsed = JSON.parse(data);
     
-    // Check if older version of database.json (just an array of photos)
     if (Array.isArray(parsed)) {
       const migrated: DatabaseSchema = {
         photos: parsed,
         settings: DEFAULT_SETTINGS,
         inquiries: []
       };
-      writeFullDatabase(migrated);
+      fs.writeFileSync(DB_FILE, JSON.stringify(migrated, null, 2), "utf-8");
       return migrated;
     }
     
@@ -183,18 +188,124 @@ function readFullDatabase(): DatabaseSchema {
     
     return { photos, settings, inquiries };
   } catch (error) {
-    console.error("Error reading database:", error);
+    console.error("Error reading local database file:", error);
     return { photos: DEFAULT_PHOTOS, settings: DEFAULT_SETTINGS, inquiries: [] };
   }
 }
 
-function writeFullDatabase(data: DatabaseSchema): void {
+function writeLocalDatabaseOnly(data: DatabaseSchema): void {
   try {
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
   } catch (error) {
-    console.error("Error writing database:", error);
+    console.error("Error writing local database file:", error);
   }
 }
+
+async function syncFromCloud(): Promise<DatabaseSchema> {
+  const now = Date.now();
+  if (localCachedDb && (now - lastCloudSyncTimestamp < CLOUD_SYNC_COOLDOWN_MS)) {
+    return localCachedDb;
+  }
+  
+  try {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), 2000); // Snappy 2 second limit
+    
+    const res = await fetch(CLOUD_DB_URL, {
+      signal: controller.signal
+    });
+    clearTimeout(id);
+    
+    if (res.ok) {
+      const text = await res.text();
+      if (text && text.trim().startsWith("{")) {
+        const cloudData = JSON.parse(text) as DatabaseSchema;
+        if (cloudData && (Array.isArray(cloudData.photos) || Array.isArray(cloudData.inquiries))) {
+          const localData = readLocalDatabaseOnly();
+          
+          // Securely merge remote and local inquiries
+          const mergedInquiries = [...(cloudData.inquiries || [])];
+          (localData.inquiries || []).forEach((localInq) => {
+            if (!mergedInquiries.some(q => q.id === localInq.id)) {
+              mergedInquiries.push(localInq);
+            }
+          });
+          mergedInquiries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          
+          // Securely merge photos
+          const mergedPhotos = [...(cloudData.photos || [])];
+          (localData.photos || []).forEach((localPhoto) => {
+            if (!mergedPhotos.some(p => p.id === localPhoto.id)) {
+              mergedPhotos.push(localPhoto);
+            }
+          });
+          
+          // Merge settings
+          const mergedSettings = {
+            ...DEFAULT_SETTINGS,
+            ...(cloudData.settings || {}),
+            ...(localData.settings || {})
+          };
+          
+          const mergedDB: DatabaseSchema = {
+            photos: mergedPhotos,
+            settings: mergedSettings,
+            inquiries: mergedInquiries
+          };
+          
+          writeLocalDatabaseOnly(mergedDB);
+          localCachedDb = mergedDB;
+          lastCloudSyncTimestamp = now;
+          
+          // Propagate if merged contains more info
+          if (mergedInquiries.length > (cloudData.inquiries || []).length || mergedPhotos.length > (cloudData.photos || []).length) {
+            pushToCloud(mergedDB);
+          }
+          
+          return mergedDB;
+        }
+      }
+    }
+  } catch (error) {
+    console.warn("Could not fetch database from backup cloud storage:", error);
+  }
+  
+  const local = readLocalDatabaseOnly();
+  localCachedDb = local;
+  return local;
+}
+
+function pushToCloud(data: DatabaseSchema): void {
+  try {
+    fetch(CLOUD_DB_URL, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    }).then((res) => {
+      if (!res.ok) {
+        console.warn(`kvdb.io database write error: status ${res.status}`);
+      }
+    }).catch(err => {
+      console.error("kvdb.io write failed:", err);
+    });
+  } catch (e) {
+    console.error("kvdb.io invoke error:", e);
+  }
+}
+
+function readFullDatabase(): DatabaseSchema {
+  if (localCachedDb) {
+    return localCachedDb;
+  }
+  return readLocalDatabaseOnly();
+}
+
+function writeFullDatabase(data: DatabaseSchema): void {
+  localCachedDb = data;
+  writeLocalDatabaseOnly(data);
+  pushToCloud(data);
+}
+// --- END PERSISTENT CLOUD STORAGE INTEGRATION ---
 
 function readDatabase(): Photo[] {
   return readFullDatabase().photos;
@@ -205,6 +316,15 @@ function writeDatabase(photos: Photo[]): void {
   db.photos = photos;
   writeFullDatabase(db);
 }
+
+const syncDbMiddleware = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  try {
+    await syncFromCloud();
+  } catch (error) {
+    console.warn("DB Sync in middleware failed:", error);
+  }
+  next();
+};
 
 // Mail transporter helper using environment variables or a fallback logger
 function getMailTransporter() {
@@ -287,13 +407,13 @@ app.post("/api/admin/verify", (req, res) => {
 });
 
 // Get all photos
-app.get("/api/photos", (req, res) => {
+app.get("/api/photos", syncDbMiddleware, (req, res) => {
   const photos = readDatabase();
   res.json(photos);
 });
 
 // Upload new photo
-app.post("/api/photos/upload", requireAdmin, upload.single("photo"), (req, res) => {
+app.post("/api/photos/upload", requireAdmin, syncDbMiddleware, upload.single("photo"), (req, res) => {
   try {
     const { title, category, camera, lens, aperture, shutter, iso, featured, orientation } = req.body;
     
@@ -336,7 +456,7 @@ app.post("/api/photos/upload", requireAdmin, upload.single("photo"), (req, res) 
 });
 
 // Inquire contact form submission
-app.post("/api/contact", async (req, res) => {
+app.post("/api/contact", syncDbMiddleware, async (req, res) => {
   const { name, email, subject, message } = req.body;
   
   if (!name || !email || !message) {
@@ -409,12 +529,12 @@ app.post("/api/contact", async (req, res) => {
 });
 
 // Settings Management API
-app.get("/api/settings", requireAdmin, (req, res) => {
+app.get("/api/settings", requireAdmin, syncDbMiddleware, (req, res) => {
   const db = readFullDatabase();
   res.json(db.settings || { contactEmail: "rezulpersonal@gmail.com" });
 });
 
-app.post("/api/settings", requireAdmin, (req, res) => {
+app.post("/api/settings", requireAdmin, syncDbMiddleware, (req, res) => {
   const { contactEmail } = req.body;
   if (!contactEmail || !contactEmail.includes("@")) {
     return res.status(400).json({ error: "Please enter a valid email address." });
@@ -428,12 +548,12 @@ app.post("/api/settings", requireAdmin, (req, res) => {
 });
 
 // Inquiries Querying API
-app.get("/api/inquiries", requireAdmin, (req, res) => {
+app.get("/api/inquiries", requireAdmin, syncDbMiddleware, (req, res) => {
   const db = readFullDatabase();
   res.json(db.inquiries || []);
 });
 
-app.delete("/api/inquiries/:id", requireAdmin, (req, res) => {
+app.delete("/api/inquiries/:id", requireAdmin, syncDbMiddleware, (req, res) => {
   const { id } = req.params;
   const db = readFullDatabase();
   
@@ -449,7 +569,7 @@ app.delete("/api/inquiries/:id", requireAdmin, (req, res) => {
   res.json({ success: true, message: "Inquiry archive entry removed" });
 });
 
-app.delete("/api/inquiries", requireAdmin, (req, res) => {
+app.delete("/api/inquiries", requireAdmin, syncDbMiddleware, (req, res) => {
   const db = readFullDatabase();
   db.inquiries = [];
   writeFullDatabase(db);
@@ -457,7 +577,7 @@ app.delete("/api/inquiries", requireAdmin, (req, res) => {
 });
 
 // Delete a photo from database and local storage (if applicable)
-app.delete("/api/photos/:id", requireAdmin, (req, res) => {
+app.delete("/api/photos/:id", requireAdmin, syncDbMiddleware, (req, res) => {
   const { id } = req.params;
   const photos = readDatabase();
   const photoIndex = photos.findIndex((p) => p.id === id);
@@ -488,7 +608,7 @@ app.delete("/api/photos/:id", requireAdmin, (req, res) => {
 });
 
 // Update an existing photo's details
-app.put("/api/photos/:id", requireAdmin, (req, res) => {
+app.put("/api/photos/:id", requireAdmin, syncDbMiddleware, (req, res) => {
   try {
     const { id } = req.params;
     const { title, category, camera, lens, aperture, shutter, iso, featured, orientation } = req.body;

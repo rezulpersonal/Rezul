@@ -191,27 +191,10 @@ export default function UploadModal({
         if (res.ok) {
           const remoteInquiries = await res.json();
           if (Array.isArray(remoteInquiries)) {
-            // Merge local and remote inquiries to protect records in frontend-only environments
-            const merged = [...data];
-            remoteInquiries.forEach((remote: Inquiry) => {
-              const isDuplicate = merged.some((local) => {
-                return (
-                  local.id === remote.id ||
-                  (local.name === remote.name &&
-                    local.email === remote.email &&
-                    local.subject === remote.subject &&
-                    local.message === remote.message)
-                );
-              });
-              if (!isDuplicate) {
-                merged.push(remote);
-              }
-            });
-            // Sort by Date (newest first)
-            merged.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-            setInquiries(merged);
-            localDb.saveInquiries(merged);
+            // Server database is the active source of truth.
+            // This ensures deletion updates and new posts synchronization across all devices!
+            setInquiries(remoteInquiries);
+            localDb.saveInquiries(remoteInquiries);
           }
         } else {
           console.warn(`Server inquiries response not OK: status ${res.status}`);

@@ -47,17 +47,32 @@ export default function App() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("hero");
 
-  // Fetch all photos from our local database (fully client-side & robust)
-  const fetchPhotos = useCallback(() => {
+  // Fetch all photos from our synchronized database
+  const fetchPhotos = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
       
+      // Load offline preheat/cache first for immediate responsiveness
       const data = localDb.getPhotos();
       setPhotos(data);
+
+      // Sync background feed with live server if active
+      try {
+        const res = await fetch("/api/photos");
+        if (res.ok) {
+          const remotePhotos = await res.json();
+          if (Array.isArray(remotePhotos) && remotePhotos.length > 0) {
+            setPhotos(remotePhotos);
+            // Save to local cache
+            localDb.savePhotos(remotePhotos);
+          }
+        }
+      } catch (backendError) {
+        console.warn("Could not fetch sync catalog from backend, running on local cache.");
+      }
     } catch (err: any) {
       console.error("Photos load error:", err);
-      // Fallback to empty array but don't crash
       setPhotos([]);
     } finally {
       setLoading(false);
