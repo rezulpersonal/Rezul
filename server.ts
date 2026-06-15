@@ -25,9 +25,13 @@ const PORT = 3000;
 const UPLOADS_DIR = path.join(process.cwd(), "uploads");
 const DB_FILE = path.join(process.cwd(), "database.json");
 
-// Create uploads directory if it does not exist
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+// Create uploads directory if it does not exist (disabled in read-only environments like Vercel)
+if (!process.env.VERCEL && !fs.existsSync(UPLOADS_DIR)) {
+  try {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  } catch (err) {
+    console.error("Failed to create uploads directory:", err);
+  }
 }
 
 // Serve uploaded files statically
