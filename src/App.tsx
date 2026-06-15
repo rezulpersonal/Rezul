@@ -8,6 +8,7 @@ import UploadModal from "./components/UploadModal";
 import AboutContact from "./components/AboutContact";
 import Footer from "./components/Footer";
 import { Photo } from "./types";
+import { localDb } from "./lib/localDb";
 
 export default function App() {
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -46,22 +47,18 @@ export default function App() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("hero");
 
-  // Fetch all photos from our Full-stack Dynamic Express backend
-  const fetchPhotos = useCallback(async () => {
+  // Fetch all photos from our local database (fully client-side & robust)
+  const fetchPhotos = useCallback(() => {
     try {
       setLoading(true);
       setError("");
       
-      const response = await fetch("/api/photos");
-      if (!response.ok) {
-        throw new Error("Failed to pull photographs registry from the atelier server.");
-      }
-      
-      const data = await response.json();
+      const data = localDb.getPhotos();
       setPhotos(data);
     } catch (err: any) {
       console.error("Photos load error:", err);
-      setError(err.message || "An unexpected network error occurred.");
+      // Fallback to empty array but don't crash
+      setPhotos([]);
     } finally {
       setLoading(false);
     }
@@ -110,20 +107,11 @@ export default function App() {
     }
   };
 
-  // Handle deletion of a photo via backend
+  // Handle deletion of a photo via localDb client-side
   const handleDeletePhoto = async (id: string) => {
     try {
-      const response = await fetch(`/api/photos/${id}`, {
-        method: "DELETE",
-        headers: {
-          "X-Admin-Passcode": adminPasscode || ""
-        }
-      });
-
-      if (!response.ok) {
-        const result = await response.json();
-        throw new Error(result.error || "Failed to remove photo.");
-      }
+      // First delete from localStorage
+      localDb.deletePhoto(id);
 
       // Remove from state instantly with transition
       setPhotos((prev) => prev.filter((photo) => photo.id !== id));
@@ -131,6 +119,18 @@ export default function App() {
       // If we are deleting the photo which is active in details, close lightbox
       if (selectedPhoto && selectedPhoto.id === id) {
         setSelectedPhoto(null);
+      }
+
+      // Optional backend synchronization
+      try {
+        await fetch(`/api/photos/${id}`, {
+          method: "DELETE",
+          headers: {
+            "X-Admin-Passcode": adminPasscode || ""
+          }
+        });
+      } catch (backendError) {
+        console.warn("Unsynchronized with backend (running in pure frontend mode):", backendError);
       }
     } catch (err: any) {
       alert(err.message || "An error occurred while deleting the artwork.");

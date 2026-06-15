@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { User, ShieldCheck, Mail, Send, Sparkles, CheckCircle2, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { InquiryFormData } from "../types";
+import { localDb } from "../lib/localDb";
 
 export default function AboutContact() {
   const [formData, setFormData] = useState<InquiryFormData>({
@@ -29,20 +30,34 @@ export default function AboutContact() {
     setSuccessMsg("");
 
     try {
-      const response = await fetch("/api/contact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+      // 1. Instantly save in local storage
+      localDb.addInquiry({
+        name: formData.name,
+        email: formData.email,
+        subject: formData.subject,
+        message: formData.message
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to make inquiry.");
-      }
-
-      setSuccessMsg(result.message || "Your inquiry was transmitted successfully.");
+      // 2. Clear form and set success state immediately (optimistic UI)
+      setSuccessMsg("Your inquiry was logged successfully in the local archive registry!");
       setFormData({ name: "", email: "", subject: "", message: "" });
+
+      // 3. Asynchronously attempt backend dispatch, but don't fail if server is down
+      try {
+        const response = await fetch("/api/contact", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        });
+        if (response.ok) {
+          const result = await response.json();
+          if (result.message) {
+            setSuccessMsg(result.message);
+          }
+        }
+      } catch (backendError) {
+        console.warn("Backend dispatch skipped (running in pure frontend mode):", backendError);
+      }
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.message || "An unexpected error occurred. Please try again.");
