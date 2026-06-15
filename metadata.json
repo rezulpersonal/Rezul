@@ -1,0 +1,6 @@
+{
+  "name": "Vieworez",
+  "description": "An elegant, interactive and beautifully animated photography portfolio website with dynamic back-end uploads and a luxury dark theme.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

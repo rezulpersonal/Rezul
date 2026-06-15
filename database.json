@@ -1,0 +1,86 @@
+{
+  "photos": [
+    {
+      "id": "seed-1",
+      "title": "Symphony of Citrus",
+      "category": "Culinary",
+      "url": "https://images.unsplash.com/photo-1611080626919-7cf5a9dbab5b?auto=format&fit=crop&q=80&w=1200",
+      "camera": "Sony A7R IV",
+      "lens": "90mm Macro",
+      "aperture": "f/2.8",
+      "shutter": "1/160s",
+      "iso": "100",
+      "date": "2026-06-01",
+      "featured": true
+    },
+    {
+      "id": "seed-2",
+      "title": "Rustique Patisserie",
+      "category": "Culinary",
+      "url": "https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&q=80&w=1200",
+      "camera": "Fujifilm GFX 100S",
+      "lens": "80mm Prime",
+      "aperture": "f/2.0",
+      "shutter": "1/125s",
+      "iso": "160",
+      "date": "2026-06-03",
+      "featured": true
+    },
+    {
+      "id": "seed-3",
+      "title": "Ethereal Obsidian",
+      "category": "Landscape",
+      "url": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&q=80&w=1200",
+      "camera": "Canon EOS R5",
+      "lens": "24-70mm f/2.8",
+      "aperture": "f/8.0",
+      "shutter": "1/4s",
+      "iso": "64",
+      "date": "2026-06-05",
+      "featured": true
+    },
+    {
+      "id": "seed-4",
+      "title": "Midnight Aurora",
+      "category": "Landscape",
+      "url": "https://images.unsplash.com/photo-1579033461380-adb47c3eb938?auto=format&fit=crop&q=80&w=1200",
+      "camera": "Nikon Z7 II",
+      "lens": "14-24mm f/2.8",
+      "aperture": "f/2.8",
+      "shutter": "15s",
+      "iso": "1600",
+      "date": "2026-06-07",
+      "featured": false
+    },
+    {
+      "id": "seed-5",
+      "title": "Monolithic Shadows",
+      "category": "Architecture",
+      "url": "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=1200",
+      "camera": "Leica M11",
+      "lens": "35mm Summilux",
+      "aperture": "f/5.6",
+      "shutter": "1/500s",
+      "iso": "200",
+      "date": "2026-06-09",
+      "featured": false
+    },
+    {
+      "id": "seed-6",
+      "title": "Golden Hour Facade",
+      "category": "Architecture",
+      "url": "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&q=80&w=1200",
+      "camera": "Sony A7R IV",
+      "lens": "24mm f/1.4",
+      "aperture": "f/4.0",
+      "shutter": "1/320s",
+      "iso": "100",
+      "date": "2026-06-11",
+      "featured": false
+    }
+  ],
+  "settings": {
+    "contactEmail": "rezulpersonal@gmail.com"
+  },
+  "inquiries": []
+}

@@ -1,0 +1,75 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Montserrat:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Cormorant Garamond", Georgia, serif;
+  --font-sans: "Montserrat", sans-serif;
+  
+  --color-gold-50: #fcfbf7;
+  --color-gold-100: #f7f3e8;
+  --color-gold-200: #eee4cc;
+  --color-gold-300: #dfcfab;
+  --color-gold-400: #d0b885;
+  --color-gold-500: #C5A059; /* Editorial Gold */
+  --color-gold-600: #a5803c;
+  --color-gold-700: #80612a;
+  --color-gold-800: #553e1a;
+  --color-gold-900: #2c1f0d;
+  
+  --color-dark-950: #0A0A0A; /* Deep dark black */
+  --color-dark-900: #0F0F0F; /* Studio charcoal */
+  --color-dark-800: #1A1A1A; /* Layer gray */
+  --color-dark-700: #2A2A2A; /* Framing gray */
+  --color-dark-600: #3D3D3D;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    font-family: var(--font-sans);
+    background-color: var(--color-dark-950);
+    color: #FDFBF7;
+  }
+  
+  body {
+    overflow-x: hidden;
+  }
+}
+
+/* Selection colors from Editorial design guidelines */
+::selection {
+  background-color: #C5A059;
+  color: #0A0A0A;
+}
+
+/* Custom scrollbar to match the editorial premium theme */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0A0A0A;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1A1A1A;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #C5A059;
+}
+
+/* Extra luxury text styling */
+.serif-heading {
+  font-family: var(--font-serif);
+  letter-spacing: -0.015em;
+}
+
+.gold-glow {
+  text-shadow: 0 0 15px rgba(197, 160, 89, 0.2);
+}
+
+.ambient-radial {
+  background: radial-gradient(circle at 50% 50%, rgba(197, 160, 89, 0.04) 0%, rgba(0, 0, 0, 0) 100%);
+}
