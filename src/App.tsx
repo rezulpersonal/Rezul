@@ -100,6 +100,16 @@ export default function App() {
     setPhotos((prev) => [newPhoto, ...prev]);
   };
 
+  // Handle update of a photo in the registry
+  const handlePhotoUpdate = (updatedPhoto: Photo) => {
+    setPhotos((prev) => prev.map((p) => p.id === updatedPhoto.id ? updatedPhoto : p));
+    
+    // If the currently magnified/lightbox photo was updated, refresh details
+    if (selectedPhoto && selectedPhoto.id === updatedPhoto.id) {
+      setSelectedPhoto(updatedPhoto);
+    }
+  };
+
   // Handle deletion of a photo via backend
   const handleDeletePhoto = async (id: string) => {
     try {
@@ -224,6 +234,9 @@ export default function App() {
         adminPasscode={adminPasscode}
         onLogin={handleLogin}
         onLogout={handleLogout}
+        photos={photos}
+        onPhotoUpdate={handlePhotoUpdate}
+        onDeletePhoto={handleDeletePhoto}
       />
     </div>
   );

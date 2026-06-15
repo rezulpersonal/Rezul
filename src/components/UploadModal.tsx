@@ -1,5 +1,5 @@
 import React, { useState, useRef, DragEvent, ChangeEvent, useEffect } from "react";
-import { X, Upload, Image, Sparkles, Check, HelpCircle, Eye, AlertCircle, Mail, Trash2, Calendar, MessageSquare, Settings, CheckCircle2 } from "lucide-react";
+import { X, Upload, Image, Sparkles, Check, HelpCircle, Eye, AlertCircle, Mail, Trash2, Calendar, MessageSquare, Settings, CheckCircle2, Camera } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Photo, Inquiry } from "../types";
 
@@ -10,10 +10,23 @@ interface UploadModalProps {
   adminPasscode: string | null;
   onLogin: (passcode: string) => void;
   onLogout: () => void;
+  photos: Photo[];
+  onPhotoUpdate: (updatedPhoto: Photo) => void;
+  onDeletePhoto: (id: string) => void;
 }
 
-export default function UploadModal({ isOpen, onClose, onUploadSuccess, adminPasscode, onLogin, onLogout }: UploadModalProps) {
-  const [activeTab, setActiveTab] = useState<"upload" | "settings" | "inquiries">("upload");
+export default function UploadModal({ 
+  isOpen, 
+  onClose, 
+  onUploadSuccess, 
+  adminPasscode, 
+  onLogin, 
+  onLogout,
+  photos,
+  onPhotoUpdate,
+  onDeletePhoto
+}: UploadModalProps) {
+  const [activeTab, setActiveTab] = useState<"upload" | "manage" | "settings" | "inquiries">("upload");
   const [contactEmail, setContactEmail] = useState("rezulpersonal@gmail.com");
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsSuccess, setSettingsSuccess] = useState("");
@@ -41,6 +54,28 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess, adminPas
   const [shutter, setShutter] = useState("");
   const [iso, setIso] = useState("");
   const [featured, setFeatured] = useState(false);
+  const [orientation, setOrientation] = useState<"portrait" | "landscape">("landscape");
+  
+  // Photo Editing States
+  const [editingPhotoId, setEditingPhotoId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editCategory, setEditCategory] = useState("Landscape");
+  const [editCustomCategory, setEditCustomCategory] = useState("");
+  const [editCamera, setEditCamera] = useState("");
+  const [editLens, setEditLens] = useState("");
+  const [editAperture, setEditAperture] = useState("");
+  const [editShutter, setEditShutter] = useState("");
+  const [editIso, setEditIso] = useState("");
+  const [editFeatured, setEditFeatured] = useState(false);
+  const [editOrientation, setEditOrientation] = useState<"portrait" | "landscape">("landscape");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [editSuccess, setEditSuccess] = useState("");
+  
+  // Deletion Confirmation States (No-modal iframe safe)
+  const [confirmPhotoDeleteId, setConfirmPhotoDeleteId] = useState<string | null>(null);
+  const [confirmInquiryDeleteId, setConfirmInquiryDeleteId] = useState<string | null>(null);
+  const [confirmClearAllInquiries, setConfirmClearAllInquiries] = useState(false);
   
   // Image handling
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -150,7 +185,6 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess, adminPas
   };
 
   const handleDeleteInquiry = async (id: string) => {
-    if (!confirm("Are you sure you want to remove this inquiry archive entry?")) return;
     try {
       const res = await fetch(`/api/inquiries/${id}`, { 
         method: "DELETE",
@@ -165,7 +199,6 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess, adminPas
   };
 
   const handleClearAllInquiries = async () => {
-    if (!confirm("Are you sure you want to clear all local inquiries?")) return;
     try {
       const res = await fetch("/api/inquiries", { 
         method: "DELETE",
@@ -337,7 +370,8 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess, adminPas
           shutter: shutter || "1/100s",
           iso: iso || "100",
           featured,
-          imageUrl: finalImageUrl
+          imageUrl: finalImageUrl,
+          orientation
         })
       });
 
@@ -374,11 +408,88 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess, adminPas
     setShutter("");
     setIso("");
     setFeatured(false);
+    setOrientation("landscape");
     setSelectedFile(null);
     setImagePreview(null);
     setExternalUrl("");
     setSuccess(false);
     setErrorMsg("");
+  };
+
+  const startEditingPhoto = (photo: Photo) => {
+    setEditingPhotoId(photo.id);
+    setEditTitle(photo.title);
+    setEditCamera(photo.camera);
+    setEditLens(photo.lens);
+    setEditAperture(photo.aperture);
+    setEditShutter(photo.shutter);
+    setEditIso(photo.iso);
+    setEditFeatured(photo.featured);
+    setEditOrientation(photo.orientation || "landscape");
+
+    const categoryPresets = ["Landscape", "Portrait", "Street & Urban", "Wildlife", "Astrophotography", "Macro & CloseUp", "Minimalist"];
+    if (categoryPresets.includes(photo.category)) {
+      setEditCategory(photo.category);
+      setEditCustomCategory("");
+    } else {
+      setEditCategory("Custom");
+      setEditCustomCategory(photo.category);
+    }
+    setEditError("");
+    setEditSuccess("");
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPhotoId) return;
+
+    setSavingEdit(true);
+    setEditError("");
+    setEditSuccess("");
+
+    try {
+      const finalCategory = editCategory === "Custom" ? editCustomCategory : editCategory;
+      
+      const response = await fetch(`/api/photos/${editingPhotoId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Admin-Passcode": adminPasscode || ""
+        },
+        body: JSON.stringify({
+          title: editTitle || "Untitled Exposure",
+          category: finalCategory || "Uncategorized",
+          camera: editCamera || "Unknown",
+          lens: editLens || "Unknown",
+          aperture: editAperture || "—",
+          shutter: editShutter || "—",
+          iso: editIso || "—",
+          featured: editFeatured,
+          orientation: editOrientation
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to update snapshot details.");
+      }
+
+      setEditSuccess("Photo details updated successfully!");
+      onPhotoUpdate(result.photo);
+      
+      // Delay slightly and return to list
+      setTimeout(() => {
+        setEditingPhotoId(null);
+        setEditSuccess("");
+      }, 1500);
+
+    } catch (err: any) {
+      console.error(err);
+      setEditError(err.message || "An error occurred while updating.");
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   return (
@@ -487,6 +598,29 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess, adminPas
                 <motion.div layoutId="modalTabBorder" className="absolute bottom-0 left-0 right-0 h-0.5 bg-gold-500" />
               )}
               Publish Photo
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("manage");
+                setEditingPhotoId(null);
+                setEditError("");
+                setEditSuccess("");
+              }}
+              className={`pb-3 text-xs font-bold uppercase tracking-widest relative cursor-pointer transition-colors flex items-center gap-2 ${
+                activeTab === "manage" ? "text-gold-500 font-extrabold" : "text-gray-400 hover:text-white"
+              }`}
+            >
+              {activeTab === "manage" && (
+                <motion.div layoutId="modalTabBorder" className="absolute bottom-0 left-0 right-0 h-0.5 bg-gold-500" />
+              )}
+              Manage Photos
+              {photos.length > 0 && (
+                <span className="bg-gold-500/10 text-gold-500 border border-gold-500/20 text-[9px] px-1.5 py-0.5 rounded-full font-mono">
+                  {photos.length}
+                </span>
+              )}
             </button>
 
             <button
@@ -772,6 +906,39 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess, adminPas
                       )}
                     </div>
 
+                    {/* Picture Proportion Selectors */}
+                    <div className="flex flex-col gap-1.5 ">
+                      <label className="text-[9px] font-bold uppercase tracking-widest text-gray-400">
+                        Picture Proportion (Orientation)
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setOrientation("portrait")}
+                          className={`flex items-center justify-center gap-2 py-2 px-3 text-xs tracking-wider uppercase font-semibold border rounded transition-all cursor-pointer ${
+                            orientation === "portrait"
+                              ? "bg-gold-500/15 border-gold-500 text-gold-500 font-bold"
+                              : "bg-dark-950 border-dark-800 text-gray-400 hover:border-gray-700 hover:text-white"
+                          }`}
+                        >
+                          <span className="w-2 h-3.5 border border-current block rounded-[1px] bg-transparent" />
+                          Portrait
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setOrientation("landscape")}
+                          className={`flex items-center justify-center gap-2 py-2 px-3 text-xs tracking-wider uppercase font-semibold border rounded transition-all cursor-pointer ${
+                            orientation === "landscape"
+                              ? "bg-gold-500/15 border-gold-500 text-gold-500 font-bold"
+                              : "bg-dark-950 border-dark-800 text-gray-400 hover:border-gray-700 hover:text-white"
+                          }`}
+                        >
+                          <span className="w-3.5 h-2 border border-current block rounded-[1px] bg-transparent" />
+                          Landscape
+                        </button>
+                      </div>
+                    </div>
+
                     {/* Subheader parameters */}
                     <div className="h-px bg-dark-800 my-1" />
                     <div className="text-[9px] font-bold tracking-[0.2em] text-gold-500/80 uppercase">
@@ -899,6 +1066,368 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess, adminPas
               </motion.div>
             )}
 
+            {activeTab === "manage" && (
+              <motion.div
+                key="manage-tab"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-6 py-4"
+              >
+                {editingPhotoId ? (
+                  /* Edit Form Mode */
+                  <div>
+                    <div className="flex items-center justify-between mb-4 border-b border-dark-800 pb-2">
+                      <h3 className="text-sm font-bold uppercase tracking-widest text-gold-500 flex items-center gap-2">
+                        <span>Editing Photo Details</span>
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setEditingPhotoId(null)}
+                        className="px-3 py-1 bg-dark-950 border border-dark-800 hover:border-gold-500 text-gray-400 hover:text-white rounded text-[10px] uppercase font-bold tracking-wider transition-all"
+                      >
+                        Back to List
+                      </button>
+                    </div>
+
+                    {editError && (
+                      <div className="mb-5 p-3.5 bg-red-950/40 border border-red-900/60 text-red-400 rounded-lg text-xs flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                        <span>{editError}</span>
+                      </div>
+                    )}
+
+                    {editSuccess && (
+                      <div className="mb-5 p-3.5 bg-emerald-950/40 border border-emerald-900/60 text-emerald-400 rounded-lg text-xs flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                        <span>{editSuccess}</span>
+                      </div>
+                    )}
+
+                    <form onSubmit={handleEditSubmit} className="grid grid-cols-1 md:grid-cols-12 gap-8">
+                      {/* Left thumbnail column (no crop) */}
+                      <div className="md:col-span-4 flex flex-col gap-4">
+                        <label className="text-[9px] font-bold uppercase tracking-widest text-gray-400">
+                          Photo Thumbnail (Aspect Preserved)
+                        </label>
+                        <div className="bg-dark-950 border border-dark-800 rounded-lg h-56 flex items-center justify-center p-2 relative overflow-hidden">
+                          {(() => {
+                            const currentPhoto = photos.find(p => p.id === editingPhotoId);
+                            if (currentPhoto) {
+                              return (
+                                <img
+                                  src={currentPhoto.url}
+                                  alt={currentPhoto.title}
+                                  className="max-w-full max-h-full object-contain rounded"
+                                  referrerPolicy="no-referrer"
+                                />
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
+                      </div>
+
+                      {/* Right metadata fields column */}
+                      <div className="md:col-span-8 flex flex-col gap-4">
+                        {/* Title & Category Row */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[9px] font-bold uppercase tracking-widest text-gray-400">
+                              Title
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={editTitle}
+                              onChange={(e) => setEditTitle(e.target.value)}
+                              className="border border-dark-800/80 focus:border-gold-500 focus:outline-none bg-dark-950 rounded px-3 py-2 text-xs text-white shadow-sm"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[9px] font-bold uppercase tracking-widest text-gray-400">
+                              Category
+                            </label>
+                            <select
+                              value={editCategory}
+                              onChange={(e) => setEditCategory(e.target.value)}
+                              className="border border-dark-800/80 focus:border-gold-500 focus:outline-none bg-dark-950 rounded px-3 py-2 text-xs text-white cursor-pointer shadow-sm"
+                            >
+                              <option value="Landscape">Landscape</option>
+                              <option value="Portrait">Portrait</option>
+                              <option value="Street & Urban">Street & Urban</option>
+                              <option value="Wildlife">Wildlife</option>
+                              <option value="Astrophotography">Astrophotography</option>
+                              <option value="Macro & CloseUp">Macro & CloseUp</option>
+                              <option value="Minimalist">Minimalist</option>
+                              <option value="Custom">Custom Group Name</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {editCategory === "Custom" && (
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[9px] font-bold uppercase tracking-widest text-gold-500/80">
+                              Specify Custom Category
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="e.g. Fine Art Monochromatic"
+                              value={editCustomCategory}
+                              onChange={(e) => setEditCustomCategory(e.target.value)}
+                              className="border border-gold-500/30 focus:border-gold-500 focus:outline-none bg-dark-950 rounded px-3 py-2 text-xs text-white shadow-sm"
+                            />
+                          </div>
+                        )}
+
+                        {/* Portrait / Landscape Selector */}
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[9px] font-bold uppercase tracking-widest text-gray-400">
+                            Picture Proportion (Orientation)
+                          </label>
+                          <div className="grid grid-cols-2 gap-3">
+                            <button
+                              type="button"
+                              onClick={() => setEditOrientation("portrait")}
+                              className={`flex items-center justify-center gap-2 py-2 px-3 text-xs tracking-wider uppercase font-semibold border rounded transition-all cursor-pointer ${
+                                editOrientation === "portrait"
+                                  ? "bg-gold-500/15 border-gold-500 text-gold-500 font-bold"
+                                  : "bg-dark-950 border-dark-800 text-gray-400 hover:border-gray-700 hover:text-white"
+                              }`}
+                            >
+                              <span className="w-2 h-3.5 border border-current block rounded-[1px] bg-transparent" />
+                              Portrait
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditOrientation("landscape")}
+                              className={`flex items-center justify-center gap-2 py-2 px-3 text-xs tracking-wider uppercase font-semibold border rounded transition-all cursor-pointer ${
+                                editOrientation === "landscape"
+                                  ? "bg-gold-500/15 border-gold-500 text-gold-500 font-bold"
+                                  : "bg-dark-950 border-dark-800 text-gray-400 hover:border-gray-700 hover:text-white"
+                              }`}
+                            >
+                              <span className="w-3.5 h-2 border border-current block rounded-[1px] bg-transparent" />
+                              Landscape
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* EXIF parameters */}
+                        <div className="h-px bg-dark-800 my-1" />
+                        <div className="text-[9px] font-bold tracking-[0.2em] text-gold-500/80 uppercase">
+                          Hardware & Exposure parameters (EXIF)
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[8px] font-bold uppercase tracking-wider text-gray-500">
+                              Camera Model
+                            </label>
+                            <input
+                              type="text"
+                              value={editCamera}
+                              onChange={(e) => setEditCamera(e.target.value)}
+                              className="border border-dark-800 focus:border-gold-500 focus:outline-none bg-dark-950 rounded px-2.5 py-1.5 text-xs font-mono text-white"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[8px] font-bold uppercase tracking-wider text-gray-500">
+                              Lens/Focal Length
+                            </label>
+                            <input
+                              type="text"
+                              value={editLens}
+                              onChange={(e) => setEditLens(e.target.value)}
+                              className="border border-dark-800 focus:border-gold-500 focus:outline-none bg-dark-950 rounded px-2.5 py-1.5 text-xs font-mono text-white"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[8px] font-bold uppercase tracking-wider text-gray-500">
+                              Aperture
+                            </label>
+                            <input
+                              type="text"
+                              value={editAperture}
+                              onChange={(e) => setEditAperture(e.target.value)}
+                              className="border border-dark-800 focus:border-gold-500 focus:outline-none bg-dark-950 rounded px-2.5 py-1.5 text-xs font-mono text-white"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[8px] font-bold uppercase tracking-wider text-gray-500">
+                              Shutter Speed
+                            </label>
+                            <input
+                              type="text"
+                              value={editShutter}
+                              onChange={(e) => setEditShutter(e.target.value)}
+                              className="border border-dark-800 focus:border-gold-500 focus:outline-none bg-dark-950 rounded px-2.5 py-1.5 text-xs font-mono text-white"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[8px] font-bold uppercase tracking-wider text-gray-500">
+                              ISO Value
+                            </label>
+                            <input
+                              type="text"
+                              value={editIso}
+                              onChange={(e) => setEditIso(e.target.value)}
+                              className="border border-dark-800 focus:border-gold-500 focus:outline-none bg-dark-950 rounded px-2.5 py-1.5 text-xs font-mono text-white"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Feature Banner Option */}
+                        <div className="flex items-center gap-3 bg-dark-950 border border-dark-800 p-3 rounded-lg hover:border-gold-500/30 transition-all cursor-pointer" onClick={() => setEditFeatured(!editFeatured)}>
+                          <input
+                            type="checkbox"
+                            id="editFeatured"
+                            checked={editFeatured}
+                            onChange={(e) => setEditFeatured(e.target.checked)}
+                            className="rounded border-dark-800 text-gold-500 focus:ring-gold-500 bg-dark-900 cursor-pointer"
+                          />
+                          <div className="flex flex-col select-none">
+                            <span className="text-[10px] font-bold uppercase text-white tracking-widest flex items-center gap-1.5">
+                              ⭐ Feature Highlight (Hero Header Slide)
+                            </span>
+                            <span className="text-[8px] text-gray-500 uppercase tracking-widest mt-0.5">
+                              Tick this box to render this artwork inside the primary landing banner slide.
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Form controls */}
+                        <div className="mt-4 flex items-center justify-end gap-3 pb-8">
+                          <button
+                            type="button"
+                            onClick={() => setEditingPhotoId(null)}
+                            className="px-5 py-2 bg-transparent hover:bg-dark-950 text-gray-400 hover:text-white border border-dark-800 rounded text-[10px] font-bold tracking-widest uppercase transition-colors"
+                            disabled={savingEdit}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={savingEdit}
+                            className="px-6 py-2 bg-gold-500 hover:bg-gold-600 font-bold uppercase tracking-widest text-dark-950 text-[10px] rounded flex items-center gap-2 transition-all cursor-pointer"
+                          >
+                            {savingEdit ? "Saving..." : "Save Changes"}
+                          </button>
+                        </div>
+                      </div>
+                    </form>
+                  </div>
+                ) : (
+                  /* Photo List/Directory Mode */
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between bg-dark-950/60 p-4 border border-dark-800 rounded-lg">
+                      <div>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-gold-500 flex items-center gap-2">
+                          <Image className="w-4 h-4 text-gold-500" />
+                          Archives Registry ({photos.length})
+                        </h3>
+                        <p className="text-[10px] text-gray-400 mt-0.5 tracking-wide">
+                          Select any published exposure to modify its catalog labels or hardware parameters.
+                        </p>
+                      </div>
+                    </div>
+
+                    {photos.length === 0 ? (
+                      <div className="py-12 border border-dashed border-dark-800/80 rounded-xl text-center text-gray-400">
+                        <Camera className="w-8 h-8 text-dark-700 mx-auto mb-3" />
+                        <span className="text-xs uppercase tracking-widest text-gray-500">No photos published yet</span>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 divide-y divide-dark-800/55 max-h-[50vh] overflow-y-auto pr-1">
+                        {photos.map((photo) => (
+                          <div key={photo.id} className="py-4 flex gap-4 items-center justify-between group">
+                            <div className="flex gap-4 items-center min-w-0">
+                              {/* Photo thumbnail - no crop representation */}
+                              <div className="w-14 h-14 bg-dark-950 border border-dark-800 rounded flex items-center justify-center overflow-hidden flex-shrink-0 p-1">
+                                <img
+                                  src={photo.url}
+                                  alt={photo.title}
+                                  className="max-w-full max-h-full object-contain"
+                                  referrerPolicy="no-referrer"
+                                />
+                              </div>
+
+                              <div className="min-w-0">
+                                <h4 className="text-xs font-bold text-white truncate uppercase tracking-widest">
+                                  {photo.title}
+                                </h4>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                  <span className="text-[9px] text-gold-500 bg-gold-500/5 border border-gold-500/10 px-1.5 py-0.5 rounded tracking-wider uppercase font-semibold">
+                                    {photo.category}
+                                  </span>
+                                  <span className="text-[9px] text-gray-400 bg-dark-950 border border-dark-800/80 px-1.5 py-0.5 rounded tracking-wider font-mono">
+                                    {photo.orientation === "portrait" ? "Portrait" : "Landscape"}
+                                  </span>
+                                  {photo.featured && (
+                                    <span className="text-[9px] text-amber-400 bg-amber-400/5 border border-amber-400/20 px-1.5 py-0.5 rounded tracking-wider uppercase font-semibold">
+                                      ⭐ slide
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                             <div className="flex gap-2 flex-shrink-0 items-center">
+                              {confirmPhotoDeleteId === photo.id ? (
+                                <div className="flex items-center gap-1 bg-dark-950 border border-red-500/50 p-1 rounded-md shadow-lg">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      onDeletePhoto(photo.id);
+                                      setConfirmPhotoDeleteId(null);
+                                    }}
+                                    className="px-2 py-1 bg-red-650 hover:bg-red-600 text-[10px] text-white font-bold uppercase rounded tracking-wider cursor-pointer transition-all"
+                                  >
+                                    Confirm
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmPhotoDeleteId(null)}
+                                    className="px-2 py-1 bg-dark-900 border border-dark-800 text-[10px] text-gray-400 hover:text-white rounded tracking-wider cursor-pointer transition-all"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => startEditingPhoto(photo)}
+                                    className="px-3 py-1.5 bg-dark-950 border border-dark-800 hover:border-gold-500 text-xs text-gold-500 hover:text-white rounded transition-colors cursor-pointer font-semibold uppercase tracking-wider"
+                                  >
+                                    Edit Detail
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmPhotoDeleteId(photo.id)}
+                                    className="p-1.5 bg-dark-950 border border-dark-800 hover:border-red-500 text-red-550 rounded hover:bg-red-500/10 transition-colors cursor-pointer"
+                                    title="Delete Photo"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </motion.div>
+            )}
+
             {activeTab === "settings" && (
               <motion.div
                 key="settings-tab"
@@ -992,12 +1521,32 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess, adminPas
                   </div>
                   
                   {inquiries.length > 0 && (
-                    <button
-                      onClick={handleClearAllInquiries}
-                      className="text-[9px] font-bold text-red-400 hover:text-red-300 border border-red-950/80 hover:border-red-500/50 bg-red-950/20 hover:bg-red-950/40 px-3 py-1.5 rounded transition-all cursor-pointer"
-                    >
-                      Clear All
-                    </button>
+                    confirmClearAllInquiries ? (
+                      <div className="flex items-center gap-1.5 bg-dark-950 border border-red-500/60 p-1 rounded-md shadow-md">
+                        <button
+                          onClick={() => {
+                            handleClearAllInquiries();
+                            setConfirmClearAllInquiries(false);
+                          }}
+                          className="px-2 py-1 bg-red-650 hover:bg-red-600 text-[9px] text-white font-bold uppercase rounded tracking-wider cursor-pointer"
+                        >
+                          Confirm Clear All
+                        </button>
+                        <button
+                          onClick={() => setConfirmClearAllInquiries(false)}
+                          className="px-2 py-1 bg-dark-900 border border-dark-800 text-[9px] text-gray-400 hover:text-white rounded tracking-wider cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmClearAllInquiries(true)}
+                        className="text-[9px] font-bold text-red-400 hover:text-red-300 border border-red-950/80 hover:border-red-500/50 bg-red-950/20 hover:bg-red-950/40 px-3 py-1.5 rounded transition-all cursor-pointer"
+                      >
+                        Clear All
+                      </button>
+                    )
                   )}
                 </div>
 
@@ -1024,13 +1573,33 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess, adminPas
                         className="p-5 border border-dark-800 bg-dark-950/80 rounded-xl relative group hover:border-gold-500/20 transition-all hover:bg-dark-950"
                       >
                         {/* Delete individual button */}
-                        <button
-                          onClick={() => handleDeleteInquiry(inq.id)}
-                          className="absolute top-4 right-4 p-1.5 text-gray-500 hover:text-red-400 hover:bg-dark-900/60 rounded transition-colors duration-300 cursor-pointer"
-                          title="Delete archive log"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {confirmInquiryDeleteId === inq.id ? (
+                          <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-dark-950 border border-red-500/50 p-1 rounded shadow-lg z-20">
+                            <button
+                              onClick={() => {
+                                handleDeleteInquiry(inq.id);
+                                setConfirmInquiryDeleteId(null);
+                              }}
+                              className="px-2 py-0.5 bg-red-650 hover:bg-red-600 text-[9px] text-white font-bold uppercase rounded cursor-pointer transition-all animate-pulse"
+                            >
+                              Delete
+                            </button>
+                            <button
+                              onClick={() => setConfirmInquiryDeleteId(null)}
+                              className="px-2 py-0.5 bg-dark-900 border border-dark-800 text-[9px] text-gray-400 hover:text-white rounded cursor-pointer transition-all"
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmInquiryDeleteId(inq.id)}
+                            className="absolute top-4 right-4 p-1.5 text-gray-500 hover:text-red-400 hover:bg-dark-900/60 rounded transition-colors duration-300 cursor-pointer"
+                            title="Delete archive log"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
 
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-3">
                           <span className="text-xs font-serif font-semibold text-white">

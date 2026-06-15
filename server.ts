@@ -16,6 +16,7 @@ interface Photo {
   iso: string;
   date: string;
   featured: boolean;
+  orientation?: string;
 }
 
 const app = express();
@@ -286,7 +287,7 @@ app.get("/api/photos", (req, res) => {
 // Upload new photo
 app.post("/api/photos/upload", requireAdmin, upload.single("photo"), (req, res) => {
   try {
-    const { title, category, camera, lens, aperture, shutter, iso, featured } = req.body;
+    const { title, category, camera, lens, aperture, shutter, iso, featured, orientation } = req.body;
     
     if (!req.file && !req.body.imageUrl) {
       return res.status(400).json({ error: "Please upload a photo file or provide an imageUrl." });
@@ -313,6 +314,7 @@ app.post("/api/photos/upload", requireAdmin, upload.single("photo"), (req, res) 
       iso: iso || "—",
       date: new Date().toISOString().split("T")[0],
       featured: featured === "true" || featured === true,
+      orientation: orientation || "landscape",
     };
 
     photos.unshift(newPhoto); // Add to the beginning so it shows up first!
@@ -475,6 +477,42 @@ app.delete("/api/photos/:id", requireAdmin, (req, res) => {
   writeDatabase(photos);
 
   res.json({ success: true, message: "Photo deleted successfully" });
+});
+
+// Update an existing photo's details
+app.put("/api/photos/:id", requireAdmin, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, category, camera, lens, aperture, shutter, iso, featured, orientation } = req.body;
+    
+    const photos = readDatabase();
+    const photoIndex = photos.findIndex((p) => p.id === id);
+
+    if (photoIndex === -1) {
+      return res.status(404).json({ error: "Photo not found" });
+    }
+
+    const updatedPhoto = {
+      ...photos[photoIndex],
+      title: title !== undefined ? title : photos[photoIndex].title,
+      category: category !== undefined ? category : photos[photoIndex].category,
+      camera: camera !== undefined ? camera : photos[photoIndex].camera,
+      lens: lens !== undefined ? lens : photos[photoIndex].lens,
+      aperture: aperture !== undefined ? aperture : photos[photoIndex].aperture,
+      shutter: shutter !== undefined ? shutter : photos[photoIndex].shutter,
+      iso: iso !== undefined ? iso : photos[photoIndex].iso,
+      featured: featured !== undefined ? (featured === "true" || featured === true) : photos[photoIndex].featured,
+      orientation: orientation !== undefined ? orientation : photos[photoIndex].orientation,
+    };
+
+    photos[photoIndex] = updatedPhoto;
+    writeDatabase(photos);
+
+    res.json({ success: true, message: "Photo updated successfully", photo: updatedPhoto });
+  } catch (error: any) {
+    console.error("Update error:", error);
+    res.status(500).json({ error: error.message || "An error occurred during photo update." });
+  }
 });
 
 // --- VITE MIDDLEWARE OR STATIC SERVING ---

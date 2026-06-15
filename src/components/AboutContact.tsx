@@ -58,7 +58,7 @@ export default function AboutContact() {
       <div className="absolute bottom-1/4 left-[5%] w-72 h-72 bg-gold-400/2 rounded-full filter blur-3xl pointer-events-none" />
 
       {/* Grid container spanning About and Contact */}
-      <div className="max-w-7xl mx-auto px-6 md:px-12 py-24 grid grid-cols-1 lg:grid-cols-12 gap-16 lg:gap-24 relative z-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-12 py-16 md:py-24 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-24 relative z-10">
         
         {/* LEFT COLUMN: ABOUT SECTION (5 Cols) */}
         <section id="about" className="lg:col-span-5 flex flex-col justify-center">
@@ -85,7 +85,7 @@ export default function AboutContact() {
           </div>
 
           {/* Core Values Icons */}
-          <div className="mt-8 grid grid-cols-2 gap-4 pt-6 border-t border-dark-800/60">
+          <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-6 pt-6 border-t border-dark-800/60">
             <div className="flex gap-3 items-start">
               <div className="p-2 bg-dark-950 border border-dark-800 rounded text-gold-500">
                 <Sparkles className="w-4 h-4" />
@@ -118,7 +118,7 @@ export default function AboutContact() {
 
         {/* RIGHT COLUMN: CONTACT INQUIRY FORM (7 Cols) */}
         <section id="contact" className="lg:col-span-7">
-          <div className="bg-dark-950/40 border border-dark-800/80 p-8 md:p-10 rounded-2xl shadow-xl">
+          <div className="bg-dark-950/40 border border-dark-800/80 p-5 sm:p-8 md:p-10 rounded-xl sm:rounded-2xl shadow-xl">
             <div className="mb-6">
               <span className="text-[10px] font-bold tracking-[0.2em] text-gold-500 uppercase block mb-1">
                 INQUIRY REGISTER

@@ -10,6 +10,7 @@ export interface Photo {
   iso: string;
   date: string;
   featured: boolean;
+  orientation?: "portrait" | "landscape";
 }
 
 export interface InquiryFormData {

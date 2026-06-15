@@ -74,15 +74,15 @@ export default function Lightbox({ photo, photos, onClose, onNavigate }: Lightbo
         </button>
 
         {/* Outer Grid Panel */}
-        <div className="w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-center h-full max-h-[85vh]">
+        <div className="w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-center h-auto lg:h-[80vh] py-12 lg:py-0">
           
           {/* Main Photo Area (8 Cols) */}
-          <div className="col-span-1 lg:col-span-8 relative flex items-center justify-center h-full min-h-[300px] lg:min-h-[500px]">
+          <div className="col-span-1 lg:col-span-8 relative flex items-center justify-center h-auto lg:h-full min-h-[250px] md:min-h-[350px] lg:min-h-[500px]">
             
             {/* navigation - Previous */}
             <button
               onClick={handlePrev}
-              className="absolute left-2 md:left-4 z-40 p-2.5 md:p-3.5 bg-dark-900/60 hover:bg-dark-900 border border-dark-800/80 hover:border-gold-500 hover:text-gold-500 text-gray-400 rounded-full transition-all cursor-pointer"
+              className="absolute left-2 md:left-4 z-40 p-3 md:p-3.5 bg-dark-900/60 hover:bg-dark-900 border border-dark-800/80 hover:border-gold-500 hover:text-gold-500 text-gray-400 rounded-full transition-all cursor-pointer"
               aria-label="Previous image"
             >
               <ChevronLeft className="w-5 h-5" />
@@ -95,12 +95,12 @@ export default function Lightbox({ photo, photos, onClose, onNavigate }: Lightbo
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-              className="relative rounded-lg overflow-hidden border border-dark-800 flex items-center justify-center max-h-[75vh]"
+              className="relative rounded-lg overflow-hidden border border-dark-800 flex items-center justify-center max-h-[45vh] lg:max-h-[75vh]"
             >
               <img
                 src={photo.url}
                 alt={photo.title}
-                className="max-w-full max-h-[75vh] object-contain rounded-lg shadow-2xl"
+                className="max-w-full max-h-[45vh] lg:max-h-[75vh] object-contain rounded-lg shadow-2xl"
                 referrerPolicy="no-referrer"
               />
             </motion.div>
@@ -108,7 +108,7 @@ export default function Lightbox({ photo, photos, onClose, onNavigate }: Lightbo
             {/* navigation - Next */}
             <button
               onClick={handleNext}
-              className="absolute right-2 md:right-4 z-40 p-2.5 md:p-3.5 bg-dark-900/60 hover:bg-dark-900 border border-dark-800/80 hover:border-gold-500 hover:text-gold-500 text-gray-400 rounded-full transition-all cursor-pointer"
+              className="absolute right-2 md:right-4 z-40 p-3 md:p-3.5 bg-dark-900/60 hover:bg-dark-900 border border-dark-800/80 hover:border-gold-500 hover:text-gold-500 text-gray-400 rounded-full transition-all cursor-pointer"
               aria-label="Next image"
             >
               <ChevronRight className="w-5 h-5" />
