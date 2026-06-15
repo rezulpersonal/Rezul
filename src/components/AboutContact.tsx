@@ -29,14 +29,19 @@ export default function AboutContact() {
     setErrorMsg("");
     setSuccessMsg("");
 
+    const submissionPayload = {
+      name: formData.name,
+      email: formData.email,
+      subject: formData.subject,
+      message: formData.message
+    };
+
     try {
-      // 1. Instantly save in local storage
-      localDb.addInquiry({
-        name: formData.name,
-        email: formData.email,
-        subject: formData.subject,
-        message: formData.message
-      });
+      // 1. Instantly save in local storage (perfect frontend persistence)
+      localDb.addInquiry(submissionPayload);
+
+      // Trigger standard and custom notifications
+      window.dispatchEvent(new CustomEvent("vieworez_inquiry_added"));
 
       // 2. Clear form and set success state immediately (optimistic UI)
       setSuccessMsg("Your inquiry was logged successfully in the local archive registry!");
@@ -47,7 +52,7 @@ export default function AboutContact() {
         const response = await fetch("/api/contact", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(submissionPayload),
         });
         if (response.ok) {
           const result = await response.json();
@@ -133,7 +138,7 @@ export default function AboutContact() {
 
         {/* RIGHT COLUMN: CONTACT INQUIRY FORM (7 Cols) */}
         <section id="contact" className="lg:col-span-7">
-          <div className="bg-dark-950/40 border border-dark-800/80 p-5 sm:p-8 md:p-10 rounded-xl sm:rounded-2xl shadow-xl">
+          <div id="contact-form-card" className="bg-dark-950/40 border border-dark-800/80 p-5 sm:p-8 md:p-10 rounded-xl sm:rounded-2xl shadow-xl">
             <div className="mb-6">
               <span className="text-[10px] font-bold tracking-[0.2em] text-gold-500 uppercase block mb-1">
                 INQUIRY REGISTER

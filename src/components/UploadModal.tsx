@@ -94,6 +94,18 @@ export default function UploadModal({
     }
   }, [isOpen, adminPasscode]);
 
+  useEffect(() => {
+    const handleInquiryAdded = () => {
+      if (adminPasscode) {
+        fetchInquiries();
+      }
+    };
+    window.addEventListener("vieworez_inquiry_added", handleInquiryAdded);
+    return () => {
+      window.removeEventListener("vieworez_inquiry_added", handleInquiryAdded);
+    };
+  }, [adminPasscode]);
+
   const handleVerifyPasscode = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!passcodeInput.trim()) {
@@ -179,12 +191,33 @@ export default function UploadModal({
         if (res.ok) {
           const remoteInquiries = await res.json();
           if (Array.isArray(remoteInquiries)) {
-            setInquiries(remoteInquiries);
-            localDb.saveInquiries(remoteInquiries);
+            // Merge local and remote inquiries to protect records in frontend-only environments
+            const merged = [...data];
+            remoteInquiries.forEach((remote: Inquiry) => {
+              const isDuplicate = merged.some((local) => {
+                return (
+                  local.id === remote.id ||
+                  (local.name === remote.name &&
+                    local.email === remote.email &&
+                    local.subject === remote.subject &&
+                    local.message === remote.message)
+                );
+              });
+              if (!isDuplicate) {
+                merged.push(remote);
+              }
+            });
+            // Sort by Date (newest first)
+            merged.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+            setInquiries(merged);
+            localDb.saveInquiries(merged);
           }
+        } else {
+          console.warn(`Server inquiries response not OK: status ${res.status}`);
         }
       } catch (e) {
-        console.log("No backend connection - operating in frontend mode.");
+        console.log("No backend connection or service error - operating in offline backup mode.");
       }
     } catch (err) {
       console.error("Error loading inquiries:", err);
